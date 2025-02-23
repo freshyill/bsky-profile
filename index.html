@@ -1,0 +1,488 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Bluesky Profile Lookup</title>
+
+  <meta name="description" content="A basically useless thing to look up a Bluesky user profile — but you can see when they joined!">
+
+<!-- Open Graph tags -->
+<meta property="og:title" content="Bluesky Profile Lookup">
+<meta property="og:description" content="A basically useless thing to look up a Bluesky user profile — but you can see when they joined!">
+<meta property="og:type" content="website">
+<meta property="og:url" content="https://bsky-profile.netlify.app">
+<meta property="og:image" content="https://bsky-profile.netlify.app/social.webp">
+
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:ital,opsz,wght@0,14..32,100..900;1,14..32,100..900&display=swap" rel="stylesheet">
+<style>
+
+/* Box sizing rules */
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+}
+
+/* Prevent font size inflation */
+html {
+  -moz-text-size-adjust: none;
+  -webkit-text-size-adjust: none;
+  text-size-adjust: none;
+}
+
+/* Remove default margin in favour of better control in authored CSS */
+body,
+h1,
+h2,
+h3,
+h4,
+p,
+figure,
+blockquote,
+dl,
+dd {
+  margin-block-end: 0;
+}
+
+/* Remove list styles on ul, ol elements with a list role, which suggests default styling will be removed */
+ul[role="list"],
+ol[role="list"] {
+  list-style: none;
+}
+
+/* Set core body defaults */
+body {
+  min-height: 100vh;
+  line-height: 1.5;
+  -webkit-font-smoothing: antialiased;
+}
+
+/* Set shorter line heights on headings and interactive elements */
+h1,
+h2,
+h3,
+h4,
+button,
+input,
+label {
+  line-height: 1.1;
+}
+
+/* Balance text wrapping on headings */
+h1,
+h2,
+h3,
+h4 {
+  text-wrap: balance;
+}
+
+/* A elements that don't have a class get default styles */
+a:not([class]) {
+  text-decoration-skip-ink: auto;
+  color: currentColor;
+}
+
+/* Make images easier to work with */
+img,
+picture {
+  max-width: 100%;
+  display: block;
+}
+
+/* Inherit fonts for inputs and buttons */
+input,
+button,
+textarea,
+select {
+  font-family: inherit;
+  font-size: inherit;
+}
+
+/* Make sure textareas without a rows attribute are not tiny */
+textarea:not([rows]) {
+  min-height: 10em;
+}
+
+/* Anything that has been anchored to should have extra scroll margin */
+:target {
+  scroll-margin-block: 5ex;
+}
+
+</style>
+<style>
+  
+:root {
+  --bg: #161e27;
+  --text: rgb(241, 243, 245);
+  --detail: rgb(147, 165, 183);
+  --border: rgb(46, 64, 82);
+  --avatarSize: 130px;
+  --detailPad: 2rem;
+  --input: rgb(30, 41, 54);
+  --accent: #0085ff;
+}
+
+body {
+  font-family: system-ui, -apple-system, sans-serif;
+  max-width: 800px;
+  margin: 0 auto;
+  padding: 2rem;
+  background: var(--bg);
+  color: var(--text);
+  display: flex;
+  flex-direction: column;
+  justify-content: flex-start;
+  align-items: flex-start;
+}
+
+.lookup-form {
+  margin-block: var(--detailPad);
+  display: inline-block;
+  display: flex;
+  flex-flow: row wrap;
+  gap: 0.5rem 1rem;
+  align-items: center;
+  width: 100%;
+}
+
+.search {
+  --inputBorder: var(--input);
+
+  background: var(--input);
+  border-radius: 8px;
+  display: flex;
+  align-items: center;
+  flex: 1 1 auto;
+  border: 2px solid var(--inputBorder);
+
+  &:hover {
+    --inputBorder: var(--border);
+  }
+
+  &:focus-within {
+    --inputBorder: var(--accent);
+  }
+
+  &:has(button:focus-visible) {
+    --inputBorder: var(--border);
+  }
+
+  input {
+    background: transparent;
+    border: 0;
+    padding: 0.75em 1em;
+    color: var(--text);
+    width: 100%;
+    display: block;
+
+    &::placeholder {
+      color: var(--detail);
+    }
+
+    &:focus {
+      outline: 0;
+    }
+  }
+
+  button {
+    appearance: none;
+    border: 0;
+    background: transparent;
+    border-radius: 50%;
+    aspect-ratio: 1;
+    display: flex;
+    align-items: center;
+    margin-right: 0.5em;
+
+    &:focus-visible {
+      outline: 2px solid var(--accent);
+    }
+
+    svg {
+      fill: var(--detail);
+      width: 16px;
+    }
+  }
+}
+
+label {
+  color: var(--detail);
+  display: inline-block;
+  min-width: fit-content;
+}
+
+.profile {
+  padding: 0;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  display: none;
+  opacity: 0;
+  overflow: hidden;
+  transition-property: display opacity;
+  transition-duration: 1s;
+  transition-behavior: allow-discrete;
+}
+
+.profile-visible {
+  display: block;
+  opacity: 1;
+
+  @starting-style {
+
+    opacity: 0;
+  }
+}
+
+.profile-details {
+  padding: var(--detailPad);
+  display: grid;
+  gap: var(--detailPad);
+  grid-template-columns: 1fr;
+  
+  @media (width > 600px) {
+    grid-template-columns: var(--avatarSize) 1fr;
+  }
+}
+
+.error {
+  color: red;
+  display: none;
+  transition-property: display opacity;
+  transition-duration: 1s;
+  transition-behavior: allow-discrete;
+}
+
+.error-visible {
+  display: block;
+  opacity: 1;
+
+  @starting-style {
+    opacity: 0;
+  }
+}
+
+.stats {
+  display: flex;
+  flex-flow: row wrap;
+  gap: .15rem 1rem;
+  line-height: 1;
+  margin-top: 1rem;
+
+  & > * {
+    min-width: fit-content;
+  }
+}
+
+.stat {
+  color: var(--detail);
+}
+
+.stat-number {
+  font-weight: bold;
+  color: var(--text);
+}
+
+.avatar-wrap {
+  flex-basis: 100%;
+  width: 100%;
+  margin-top: calc(-1 * (var(--avatarSize) * 0.5) - var(--detailPad));
+}
+
+.avatar {
+  width: var(--avatarSize);
+  height: var(--avatarSize);
+  max-width: 100%;
+  aspect-ratio: 1;
+  border-radius: 50%;
+  margin-inline: auto;
+  box-shadow: 0 0 0 2px var(--bg);
+  border: 1px solid var(--border);
+}
+
+h1 {
+  font-size: 3rem;
+}
+
+.displayname {
+  margin-top: 0;
+  font-size: 2rem;
+}
+
+.handlename {
+  color: var(--detail);
+  margin-top: .25rem;
+
+  a {
+    text-decoration: none;
+    &:hover {
+      text-decoration: underline;
+    }
+  }
+}
+
+img {
+  display: block;
+  max-width: 100%;
+}
+
+  </style>
+</head>
+<body>
+<main>
+
+
+<h1>Bluesky profile lookup</h1>
+
+<div class="lookup-form">
+  <label for="handle">Enter Bluesky handle:</label>
+  <div class="search">
+    <input type="text" id="handle" autocapitalize="none" placeholder="e.g. jay.bsky.team">
+    <button onclick="lookupProfile()" aria-label="lookup profile">
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512">
+        <path d="M416 208c0 45.9-14.9 88.3-40 122.7L486.6 441.4 509.3 464 464 509.3l-22.6-22.6L330.7 376c-34.4 25.2-76.8 40-122.7 40C93.1 416 0 322.9 0 208S93.1 0 208 0S416 93.1 416 208zM208 352a144 144 0 1 0 0-288 144 144 0 1 0 0 288z" />
+      </svg>
+    </button>
+  </div>
+</div>
+
+<div id="error" class="error"></div>
+
+<div id="profile" class="profile">
+
+  <img src="" class="banner" id="banner" aria-hidden="true">
+
+  <div class="profile-details">
+    
+    <div class="avatar-wrap">
+      <img id="avatar" src="" alt="Profile avatar" class="avatar">
+    </div>
+
+    <div class="profile-info">
+      <h2 id="displayName" class="displayname"></h2>
+      <p id="handleName" class="handlename"></p>
+      <div class="stats">
+        <span class="stat"><span id="followers" class="followers stat-number"></span> followers</span>
+        <span class="stat"><span id="following" class="following stat-number"></span> following</span>
+        <span class="stat"><span id="count" class="count stat-number"></span> posts</span>
+      </div>
+      <p id="description"></p>
+      <p id="joined">Joined <span id="createdAt"></span></p>
+    </div>
+
+  </div>
+</div>
+
+</main>
+
+
+
+  
+
+  <script>
+// Get URL parameters
+function getQueryParam(param) {
+  try {
+    const searchParams = new URLSearchParams(window.location.search);
+    return searchParams.get(param);
+  } catch (error) {
+    console.error('Error getting URL parameter:', error);
+    return null;
+  }
+}
+
+// Function to update URL with profile parameter
+function updateURL(handle) {
+  try {
+    const newURL = new URL(window.location);
+    if (handle) {
+      newURL.searchParams.set('profile', handle);
+    }
+    history.pushState({}, '', newURL);
+  } catch (error) {
+    console.error('Error updating URL:', error);
+  }
+}
+
+async function lookupProfile(handle) {
+  // Get handle from input if not provided
+  if (!handle) {
+    handle = document.getElementById("handle").value.trim();
+  }
+  
+  // Don't proceed if no handle
+  if (!handle) {
+    return;
+  }
+
+  // Convert handle to lowercase
+  handle = handle.toLowerCase();
+
+  const profileDiv = document.getElementById("profile");
+  const errorDiv = document.getElementById("error");
+  profileDiv.classList.remove("profile-visible");
+  errorDiv.classList.remove("error-visible");
+  
+  
+  try {
+    const response = await fetch(
+      `https://public.api.bsky.app/xrpc/app.bsky.actor.getProfiles?actors=${encodeURIComponent(
+        handle
+      )}`
+    );
+    if (!response.ok) {
+      throw new Error("Failed to fetch profile");
+    }
+    const data = await response.json();
+    const profile = data.profiles[0];
+    
+    // Update URL with the profile handle
+    updateURL(handle);
+    
+    // Update input field to match current profile
+    document.getElementById("handle").value = handle;
+    
+    document.getElementById("avatar").src = profile.avatar || "";
+    document.getElementById("banner").src = profile.banner || "bsky-bg.webp";
+    document.getElementById("displayName").textContent = profile.displayName || "???";
+    document.getElementById("handleName").innerHTML =  `<a href="https://bsky.app/profile/${profile.handle}">@${profile.handle}</a>` || "???";
+    document.getElementById("description").textContent = profile.description || "";
+    document.getElementById("followers").textContent = Number(profile.followersCount || 0).toLocaleString('en-US');
+    document.getElementById("following").textContent = Number(profile.followsCount || 0).toLocaleString('en-US');
+    document.getElementById("count").textContent = Number(profile.postsCount || 0).toLocaleString('en-US');
+    
+    // Format the createdAt date
+    const createdDate = new Date(profile.createdAt);
+    const formattedDate = createdDate.toLocaleDateString('en-US', {
+      year: 'numeric',
+      month: 'long',
+      day: 'numeric'
+    });
+    document.getElementById("createdAt").textContent = formattedDate;
+    
+    profileDiv.classList.add("profile-visible");
+  } catch (error) {
+    errorDiv.textContent = "Error fetching profile: " + error.message;
+    errorDiv.classList.add("error-visible");
+  }
+}
+
+// Add event listener for page load to check URL parameters
+document.addEventListener('DOMContentLoaded', () => {
+  const profileParam = getQueryParam('profile');
+  if (profileParam) {
+    lookupProfile(profileParam);
+  }
+});
+
+// Add event listener for Enter key on input
+document.getElementById('handle').addEventListener('keypress', (event) => {
+  if (event.key === 'Enter') {
+    lookupProfile();
+  }
+});
+  </script>
+</body>
+</html>
